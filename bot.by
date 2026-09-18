@@ -1,0 +1,58 @@
+import os
+import logging
+
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from openai import OpenAI
+
+logging.basicConfig(level=logging.INFO)
+
+TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+SYSTEM_PROMPT = """
+تو MajidGold AI هستی؛ یک دستیار فارسی‌زبان.
+به سوال‌های کاربر واضح و دوستانه جواب بده.
+برای سوالات ترید، آموزشی و مسئولانه پاسخ بده و سود تضمینی وعده نده.
+"""
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "سلام 👋 من MajidGold AI هستم.\nپیامت رو بفرست تا کمکت کنم."
+    )
+
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip()
+
+    if not text:
+        return
+
+    try:
+        response = client.responses.create(
+            model="gpt-5-mini",
+            instructions=SYSTEM_PROMPT,
+            input=text,
+        )
+
+        await update.message.reply_text(response.output_text)
+
+    except Exception:
+        logging.exception("OpenAI request failed")
+        await update.message.reply_text(
+            "فعلاً مشکلی در اتصال پیش آمده. دوباره امتحان کن."
+        )
+
+def main():
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, chat)
+    )
+
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
